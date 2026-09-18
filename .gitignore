@@ -10,4 +10,6 @@ test_*.exe
 test_*.obj
 test_*.pdf
 shtest.*
-runtest.bat
+runtest*.bat
+*.obj
+*.exe
