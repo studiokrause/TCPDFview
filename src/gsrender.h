@@ -16,4 +16,9 @@ public:
 
     // Render one page aspect-fitted onto an exact w×h white bitmap (for thumbnails).
     static HBITMAP RenderThumb(const std::wstring& pdfPath, int page, int w, int h);
+
+    // True page count via the PDF interpreter (handles object streams /
+    // compressed xref that defeat text search). Returns -1 on failure.
+    // Uses -dNOSAFER metadata-only instance (structure query, no output).
+    static int GetPageCount(const std::wstring& pdfPath);
 };

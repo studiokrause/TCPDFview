@@ -13,6 +13,11 @@ typedef int (__stdcall *PFN_gsapi_set_stdio)(void*,
     int (__stdcall *)(void*, const char*, int));
 typedef int (__stdcall *PFN_gsapi_init_with_args)(void*, int, char**);
 typedef int (__stdcall *PFN_gsapi_exit)(void*);
+typedef int (__stdcall *PFN_gsapi_run_string)(void*, const char*, int, int*);
+typedef int (__stdcall *PFN_gsapi_set_stdio_with_handle)(void*,
+    int (__stdcall *)(void*, char*, int),
+    int (__stdcall *)(void*, const char*, int),
+    int (__stdcall *)(void*, const char*, int), void*);
 
 static std::wstring g_dir;
 static HMODULE g_lib = NULL;
@@ -172,6 +177,65 @@ HBITMAP GSRender::RenderPage(const std::wstring& pdfPath, int page, int dpi) {
     HBITMAP bmp = (HBITMAP)LoadImageW(NULL, out.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
     DeleteFileW(out.c_str());
     return bmp;
+}
+
+static int __stdcall CapStdout(void* h, const char* str, int len) {
+    if (h && str && len > 0) ((std::string*)h)->append(str, len);
+    return len;
+}
+
+int GSRender::GetPageCount(const std::wstring& pdfPath) {
+    HMODULE lib = LoadGS();
+    if (!lib) return -1;
+    auto pNew = (PFN_gsapi_new_instance)GetProcAddress(lib, "gsapi_new_instance");
+    auto pDel = (PFN_gsapi_delete_instance)GetProcAddress(lib, "gsapi_delete_instance");
+    auto pEnc = (PFN_gsapi_set_arg_encoding)GetProcAddress(lib, "gsapi_set_arg_encoding");
+    auto pStdH = (PFN_gsapi_set_stdio_with_handle)GetProcAddress(lib, "gsapi_set_stdio_with_handle");
+    auto pRun = (PFN_gsapi_run_string)GetProcAddress(lib, "gsapi_run_string");
+    auto pExit = (PFN_gsapi_exit)GetProcAddress(lib, "gsapi_exit");
+    if (!pNew || !pDel || !pRun || !pExit) return -1;
+
+    std::wstring ps = ShortPath(pdfPath);
+    for (auto& c : ps) if (c == L'\\') c = L'/';
+    std::string pa = ToUtf8(ps), esc;
+    for (char c : pa) {
+        if (c == '\\' || c == '(' || c == ')') esc.push_back('\\');
+        esc.push_back(c);
+    }
+    std::string prog = "(" + esc + ") (r) file runpdfbegin pdfpagecount = quit\n";
+
+    std::string captured;
+    int pages = -1;
+    EnsureCS();
+    EnterCriticalSection(&g_cs);
+    void* inst = NULL;
+    if (pNew && pNew(&inst, NULL) >= 0 && inst) {
+        if (pEnc) pEnc(inst, GS_ARG_ENCODING_UTF8);
+        if (pStdH) pStdH(inst, NullStdin, CapStdout, NullStderr, &captured);
+        auto pInit = (PFN_gsapi_init_with_args)GetProcAddress(lib, "gsapi_init_with_args");
+        int ec = 0, irc = -999, rrc = -999;
+        if (pInit) {
+            const char* args[] = {"gs", "-dNOSAFER", "-dNODISPLAY", "-q"};
+            std::vector<char*> argv;
+            for (auto a : args) argv.push_back(const_cast<char*>(a));
+            irc = pInit(inst, (int)argv.size(), argv.data());
+        }
+        if (irc == 0 && pRun)
+            rrc = pRun(inst, prog.c_str(), 0, &ec); // ends with quit -> gs_error_Quit, fine
+        pExit(inst);
+        pDel(inst);
+        // parse first integer from captured stdout
+        size_t i = 0;
+        while (i < captured.size() && !(captured[i] >= '0' && captured[i] <= '9')) i++;
+        size_t j = i;
+        while (j < captured.size() && captured[j] >= '0' && captured[j] <= '9') j++;
+        if (j > i) {
+            pages = atoi(captured.substr(i, j - i).c_str());
+            if (pages < 1 || pages > 1000000) pages = -1;
+        }
+    }
+    LeaveCriticalSection(&g_cs);
+    return pages;
 }
 
 HBITMAP GSRender::RenderThumb(const std::wstring& pdfPath, int page, int w, int h) {

@@ -1,4 +1,4 @@
-// TCPDFview v0.5 — Total Commander Lister (WLX) plugin for PDF.
+// TCPDFview v0.6 — Total Commander Lister (WLX) plugin for PDF.
 // Implements official WLX API: ListLoad/W, ListLoadNext/W, ListCloseWindow,
 // ListGetDetectString, ListSetDefaultParams, ListGetPreviewBitmap/W,
 // ListSearchText/W, ListSendCommand, ListPrint/W.
@@ -18,7 +18,7 @@
 #include "shellthumb.h"
 #include "pdfparse.h"
 
-#define TCPDFVIEW_VERSION L"0.5"
+#define TCPDFVIEW_VERSION L"0.6"
 
 static HINSTANCE g_hInst = NULL;
 static std::wstring g_iniPath;
@@ -35,7 +35,7 @@ struct ViewerState {
     int bmpW = 0, bmpH = 0;
     int curPage = 1;
     double zoom = 1.0;
-    bool fit = true;
+    int fitMode = 0; // 0 = fit window, 1 = fit width, 2 = free zoom
     int scrollX = 0;
     int scrollY = 0;
 };
@@ -96,31 +96,33 @@ static void OpenInExplorer(const std::wstring& file) {
 static void DoContextMenu(ViewerState* st) {
     HMENU m = CreatePopupMenu();
     AppendMenuW(m, MF_STRING, 11, GetString("fit").c_str());
-    AppendMenuW(m, MF_STRING, 12, GetString("zin").c_str());
-    AppendMenuW(m, MF_STRING, 13, GetString("zout").c_str());
+    AppendMenuW(m, MF_STRING, 12, GetString("fit_width").c_str());
+    AppendMenuW(m, MF_STRING, 13, GetString("zin").c_str());
+    AppendMenuW(m, MF_STRING, 14, GetString("zout").c_str());
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(m, MF_STRING, 14, GetString("prev_page").c_str());
-    AppendMenuW(m, MF_STRING, 15, GetString("next_page").c_str());
+    AppendMenuW(m, MF_STRING, 15, GetString("prev_page").c_str());
+    AppendMenuW(m, MF_STRING, 16, GetString("next_page").c_str());
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(m, MF_STRING, 16, GetString("open_tc").c_str());
-    AppendMenuW(m, MF_STRING, 17, GetString("open_exp").c_str());
+    AppendMenuW(m, MF_STRING, 17, GetString("open_tc").c_str());
+    AppendMenuW(m, MF_STRING, 18, GetString("open_exp").c_str());
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(m, MF_STRING, 18, GetString("clear_cache").c_str());
+    AppendMenuW(m, MF_STRING, 19, GetString("clear_cache").c_str());
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(m, MF_STRING, 19, GetString("about_menu").c_str()); // last position = About
+    AppendMenuW(m, MF_STRING, 20, GetString("about_menu").c_str()); // last position = About
     POINT pt; GetCursorPos(&pt);
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, st->hwnd, NULL);
     DestroyMenu(m);
     switch (cmd) {
-        case 11: st->fit = true; st->zoom = 1.0; st->scrollX = st->scrollY = 0; break;
-        case 12: st->fit = false; st->zoom *= 1.25; if (st->zoom > 8) st->zoom = 8; break;
-        case 13: st->fit = false; st->zoom /= 1.25; if (st->zoom < 0.2) st->zoom = 0.2; break;
-        case 14: if (st->curPage > 1) { st->curPage--; RenderCurrentPage(st); } st->scrollY = 0; break;
-        case 15: if (st->curPage < st->pdf.pageCount) { st->curPage++; RenderCurrentPage(st); } st->scrollY = 0; break;
-        case 16: SendMessageW(st->hwndParent, WM_CLOSE, 0, 0); return; // back to TC file
-        case 17: OpenInExplorer(st->file); return;
-        case 18: ThumbnailCache::ClearCache(); MessageBoxW(st->hwnd, GetString("clear_cache").c_str(), GetString("about_title").c_str(), MB_OK | MB_ICONINFORMATION); return;
-        case 19: ShowAbout(st->hwnd); return;
+        case 11: st->fitMode = 0; st->zoom = 1.0; st->scrollX = st->scrollY = 0; break;
+        case 12: st->fitMode = 1; st->zoom = 1.0; st->scrollX = st->scrollY = 0; break;
+        case 13: st->fitMode = 2; st->zoom *= 1.25; if (st->zoom > 8) st->zoom = 8; break;
+        case 14: st->fitMode = 2; st->zoom /= 1.25; if (st->zoom < 0.2) st->zoom = 0.2; break;
+        case 15: if (st->curPage > 1) { st->curPage--; RenderCurrentPage(st); } st->scrollY = 0; break;
+        case 16: if (st->curPage < st->pdf.pageCount) { st->curPage++; RenderCurrentPage(st); } st->scrollY = 0; break;
+        case 17: SendMessageW(st->hwndParent, WM_CLOSE, 0, 0); return; // back to TC file
+        case 18: OpenInExplorer(st->file); return;
+        case 19: ThumbnailCache::ClearCache(); MessageBoxW(st->hwnd, GetString("cache_cleared").c_str(), GetString("about_title").c_str(), MB_OK | MB_ICONINFORMATION); return;
+        case 20: ShowAbout(st->hwnd); return;
         default: return;
     }
     UpdateScrollbars(st);
@@ -138,12 +140,22 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (st) {
                 int margin = 12;
                 int topY = 54;
-                // header
+                // header (effective zoom: fitted or manual)
+                int effPct = 100;
+                if (st->pageBmp && st->bmpW > 0 && st->bmpH > 0 && st->fitMode == 2)
+                    effPct = (int)(st->zoom * 100);
+                else if (st->pageBmp && st->bmpW > 0) {
+                    int aw = rc.right - rc.left - 2 * margin; if (aw < 50) aw = 50;
+                    int ah = rc.bottom - topY - margin; if (ah < 50) ah = 50;
+                    double fs = min((double)aw / st->bmpW, (double)ah / st->bmpH);
+                    if (st->fitMode == 1) fs = (double)aw / st->bmpW;
+                    effPct = (int)(fs * 100);
+                }
                 wchar_t head[512];
                 swprintf_s(head, L"TCPDFview v%s  |  %s  |  %d/%d  |  %d%%",
                     TCPDFVIEW_VERSION, BaseName(st->file).c_str(),
                     st->curPage, st->pdf.pageCount > 0 ? st->pdf.pageCount : 1,
-                    (int)(st->zoom * 100));
+                    effPct);
                 SetBkMode(dc, TRANSPARENT);
                 DrawTextW(dc, head, -1, &RECT{margin, 4, rc.right - margin, 50}, DT_LEFT | DT_WORDBREAK);
 
@@ -153,11 +165,12 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     int availH = rc.bottom - topY - margin;
                     if (availW < 50) availW = 50; if (availH < 50) availH = 50;
                     double fitScale = min((double)availW / st->bmpW, (double)availH / st->bmpH);
-                    double scale = st->fit ? fitScale : fitScale * st->zoom;
+                    double widthScale = (double)availW / st->bmpW;
+                    double scale = st->fitMode == 0 ? fitScale : st->fitMode == 1 ? widthScale : fitScale * st->zoom;
                     int dw = max(50, (int)(st->bmpW * scale));
                     int dh = max(50, (int)(st->bmpH * scale));
-                    int dx = margin + (st->fit ? (availW - dw) / 2 : -st->scrollX);
-                    int dy = topY + (st->fit ? 0 : -st->scrollY);
+                    int dx = margin + (st->fitMode == 0 ? (availW - dw) / 2 : -st->scrollX);
+                    int dy = topY + (st->fitMode == 0 ? 0 : -st->scrollY);
                     HDC mem = CreateCompatibleDC(dc);
                     HBITMAP old = (HBITMAP)SelectObject(mem, st->pageBmp);
                     SetStretchBltMode(dc, HALFTONE);
@@ -198,7 +211,7 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             EndPaint(h, &ps);
             return 0;
         }
-        case WM_SIZE: if (st && st->fit) InvalidateRect(h, NULL, TRUE); return 0;
+        case WM_SIZE: if (st && st->fitMode != 2) InvalidateRect(h, NULL, TRUE); return 0;
         case WM_VSCROLL: if (st) {
             int d = 0;
             switch (LOWORD(wp)) {
@@ -227,15 +240,19 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             int key = (int)wp;
             bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
             if (key == '0' || key == VK_NUMPAD0 || key == VK_MULTIPLY || key == 106 || key == 42) {
-                st->fit = true; st->zoom = 1.0; st->scrollX = st->scrollY = 0;
+                st->fitMode = 0; st->zoom = 1.0; st->scrollX = st->scrollY = 0;
+                UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0;
+            }
+            if (key == VK_DIVIDE || key == VK_OEM_2 || key == 111 || key == 47) { // "/" main + numpad
+                st->fitMode = 1; st->zoom = 1.0; st->scrollX = st->scrollY = 0;
                 UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0;
             }
             if (key == VK_ADD || key == VK_OEM_PLUS || key == 107) {
-                st->fit = false; st->zoom *= 1.25; if (st->zoom > 8) st->zoom = 8;
+                st->fitMode = 2; st->zoom *= 1.25; if (st->zoom > 8) st->zoom = 8;
                 UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0;
             }
             if (key == VK_SUBTRACT || key == VK_OEM_MINUS || key == 109) {
-                st->fit = false; st->zoom /= 1.25; if (st->zoom < 0.2) st->zoom = 0.2;
+                st->fitMode = 2; st->zoom /= 1.25; if (st->zoom < 0.2) st->zoom = 0.2;
                 UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0;
             }
             if (key == VK_UP) { st->scrollY -= 40; if (st->scrollY < 0) st->scrollY = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
@@ -281,6 +298,13 @@ static HWND CreateViewer(HWND parent, const std::wstring& file) {
     PdfInfo info = ParsePdf(file);
     // ListLoad must return NULL for unsupported files (unless forceshow handled by caller)
     if (!info.valid) return NULL;
+    // True page count via Ghostscript (text search misses pages hidden in
+    // object streams / compressed xref of longer modern PDFs, which capped
+    // PgDn navigation at the first pages).
+    if (GSRender::Available()) {
+        int n = GSRender::GetPageCount(file);
+        if (n > 0) info.pageCount = n;
+    }
 
     HWND hwnd = CreateWindowExW(0, kClass, L"TCPDFview",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL,
@@ -288,7 +312,7 @@ static HWND CreateViewer(HWND parent, const std::wstring& file) {
     if (!hwnd) return NULL;
     ViewerState* st = new ViewerState();
     st->hwnd = hwnd; st->hwndParent = parent; st->file = file; st->pdf = std::move(info);
-    st->curPage = 1; st->zoom = 1.0; st->fit = true;
+    st->curPage = 1; st->zoom = 1.0; st->fitMode = 0;
     RenderCurrentPage(st);
     g_views[hwnd] = st;
     UpdateScrollbars(st);
@@ -307,12 +331,21 @@ HWND __stdcall ListLoadW(HWND ParentWin, WCHAR* FileToLoad, int ShowFlags) {
     return CreateViewer(ParentWin, std::wstring(FileToLoad));
 }
 
+static void FixPageCount(PdfInfo& info, const std::wstring& file) {
+    if (GSRender::Available()) {
+        int n = GSRender::GetPageCount(file);
+        if (n > 0) info.pageCount = n;
+    }
+}
+
 int __stdcall ListLoadNext(HWND ParentWin, HWND PluginWin, char* FileToLoad, int ShowFlags) {
     ViewerState* st = GetState(PluginWin);
     if (!st) return LISTPLUGIN_ERROR;
     PdfInfo info = ParsePdf(A2W(FileToLoad));
     if (!info.valid) return LISTPLUGIN_ERROR;
-    st->file = A2W(FileToLoad); st->pdf = std::move(info);
+    st->file = A2W(FileToLoad);
+    FixPageCount(info, st->file);
+    st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
     RenderCurrentPage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);
@@ -324,7 +357,9 @@ int __stdcall ListLoadNextW(HWND ParentWin, HWND PluginWin, WCHAR* FileToLoad, i
     if (!st || !FileToLoad) return LISTPLUGIN_ERROR;
     PdfInfo info = ParsePdf(std::wstring(FileToLoad));
     if (!info.valid) return LISTPLUGIN_ERROR;
-    st->file = FileToLoad; st->pdf = std::move(info);
+    st->file = FileToLoad;
+    FixPageCount(info, st->file);
+    st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
     RenderCurrentPage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);

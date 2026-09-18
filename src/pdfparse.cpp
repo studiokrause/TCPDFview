@@ -1,7 +1,7 @@
 #include "pdfparse.h"
 #include <fstream>
 
-#define TCPDFVIEW_VERSION L"0.5"
+#define TCPDFVIEW_VERSION L"0.6"
 
 std::wstring FileVersionString() { return TCPDFVIEW_VERSION; }
 
