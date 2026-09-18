@@ -1,0 +1,5 @@
+[installer]
+file=tcpdfview.wlx
+defaultdir=TCPDFview
+description=TCPDFview PDF Viewer & Thumbnail Plugin by Studio Krause
+type=wlx
