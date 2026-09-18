@@ -1,0 +1,9 @@
+Napisz wtyczkę do Total Commandera, która:
+1. Wyświetli podgląd PDF w listerze: dopasowanie wielkości strony do okna klawiszem "0" oraz "*" na klawiaturze zwykłej i numerycznej, powiększanie/zmniejszanie przez "+" i "-", przesuwanie strzałkami (o kilka wierszy) oraz pgUp/pgDwn o całą stronę (pgDown do kolejnej), Esc - zamknięcie, Enter - przejście do pliku w Total Commanderze, Shift+Enter - przejście do pliku w Exploratorze Windows.
+2. Wyświetli miniatury PDF w widoku miniatur
+3. Będzie tworzyła cache miniatur istniejących plików PDF przy włączaniu widoku i korzystała z niego w kolejnych podglądach, pilnując, czy plik PDF się nie zmienił (w listerze w menu pod prawym przyciskiem dodaj "Wyczyść cache")
+Może używać ghostview, ale niech będzie dołączony do pliku instalacyjnego wtyczki.
+4. Wszystkie polecenia mają być też dostępne w menu prawego przycisku myszy.
+5. Wtyczka ma się nazywać: TCPDFview, w opisie używaj autor: Studio Krause / _nazwamodelu_ (jeżeli będziemy zmieniać modele, to dopisz kolejne). Pierwsza wersja ma mieć numer .1, kolejne iteracje mają rosnąć o .1, chyba, że podam nową numerację. Stwórz opis i umieszczaj w nim również licencję AGPL (ze względu na licencję ghostscript) oraz numer wersji. Opis ma się pojawić jako okno wywoływane z ostatnie pozycji menu prawego przycisku myszy o nazwie "O programie".
+6. Dodaj wersje językowe: Pl, En, De, Fr, Es, It
+7. Stwórz nowe prywatne repo na github i pushuj do niego progres, łącznie z release (gotowy plik ZIP do instalacji). Plik README.md ma zawierać dane z opisu, w tym wersję i licencję.

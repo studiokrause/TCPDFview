@@ -1,0 +1,3 @@
+D:/cmdc/TC-PDFview-SK/build/CMakeFiles/tcpdfview.dir
+D:/cmdc/TC-PDFview-SK/build/CMakeFiles/ALL_BUILD.dir
+D:/cmdc/TC-PDFview-SK/build/CMakeFiles/ZERO_CHECK.dir
