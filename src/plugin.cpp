@@ -1,4 +1,4 @@
-// TCPDFview v0.3 — Total Commander Lister (WLX) plugin for PDF.
+// TCPDFview v0.4 — Total Commander Lister (WLX) plugin for PDF.
 // Implements official WLX API: ListLoad/W, ListLoadNext/W, ListCloseWindow,
 // ListGetDetectString, ListSetDefaultParams, ListGetPreviewBitmap/W,
 // ListSearchText/W, ListSendCommand, ListPrint/W.
@@ -14,10 +14,11 @@
 #include "lang.h"
 #include "cache.h"
 #include "ghostscript.h"
+#include "gsrender.h"
 #include "shellthumb.h"
 #include "pdfparse.h"
 
-#define TCPDFVIEW_VERSION L"0.3"
+#define TCPDFVIEW_VERSION L"0.4"
 
 static HINSTANCE g_hInst = NULL;
 static std::wstring g_iniPath;
@@ -43,12 +44,15 @@ static void FreePageBmp(ViewerState* st) {
     if (st && st->pageBmp) { DeleteObject(st->pageBmp); st->pageBmp = NULL; }
 }
 
-static void EnsurePageImage(ViewerState* st) {
+static void RenderCurrentPage(ViewerState* st) {
     FreePageBmp(st);
-    // hi-res enough for smooth zoom, capped for memory.
-    // Flatten: shell bitmaps carry alpha -> composite over white,
-    // otherwise the page shows BLACK (StretchBlt ignores alpha).
-    st->pageBmp = FlattenOverWhite(GetShellImage(st->file, 1400, 1400));
+    HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    // 1) Ghostscript (bundled): true per-page raster, 150 dpi
+    st->pageBmp = GSRender::RenderPage(st->file, st->curPage, 150);
+    // 2) system thumbnail (first page only, but better than nothing)
+    if (!st->pageBmp && st->curPage == 1)
+        st->pageBmp = FlattenOverWhite(GetShellImage(st->file, 1400, 1400));
+    SetCursor(oldCur);
     if (st->pageBmp) {
         BITMAP b{};
         if (GetObject(st->pageBmp, sizeof(b), &b)) { st->bmpW = b.bmWidth; st->bmpH = b.bmHeight; }
@@ -111,8 +115,8 @@ static void DoContextMenu(ViewerState* st) {
         case 11: st->fit = true; st->zoom = 1.0; st->scrollX = st->scrollY = 0; break;
         case 12: st->fit = false; st->zoom *= 1.25; if (st->zoom > 8) st->zoom = 8; break;
         case 13: st->fit = false; st->zoom /= 1.25; if (st->zoom < 0.2) st->zoom = 0.2; break;
-        case 14: if (st->curPage > 1) st->curPage--; st->scrollY = 0; break;
-        case 15: if (st->curPage < st->pdf.pageCount) st->curPage++; st->scrollY = 0; break;
+        case 14: if (st->curPage > 1) { st->curPage--; RenderCurrentPage(st); } st->scrollY = 0; break;
+        case 15: if (st->curPage < st->pdf.pageCount) { st->curPage++; RenderCurrentPage(st); } st->scrollY = 0; break;
         case 16: SendMessageW(st->hwndParent, WM_CLOSE, 0, 0); return; // back to TC file
         case 17: OpenInExplorer(st->file); return;
         case 18: ThumbnailCache::ClearCache(); MessageBoxW(st->hwnd, GetString("clear_cache").c_str(), GetString("about_title").c_str(), MB_OK | MB_ICONINFORMATION); return;
@@ -143,8 +147,8 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 SetBkMode(dc, TRANSPARENT);
                 DrawTextW(dc, head, -1, &RECT{margin, 4, rc.right - margin, 50}, DT_LEFT | DT_WORDBREAK);
 
-                if (st->pageBmp && st->curPage == 1 && st->bmpW > 0 && st->bmpH > 0) {
-                    // real system-rendered first page
+                if (st->pageBmp && st->bmpW > 0 && st->bmpH > 0) {
+                    // Ghostscript raster of the current page (or system thumbnail for p.1)
                     int availW = rc.right - rc.left - 2 * margin;
                     int availH = rc.bottom - topY - margin;
                     if (availW < 50) availW = 50; if (availH < 50) availH = 50;
@@ -238,8 +242,8 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (key == VK_DOWN) { st->scrollY += 40; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
             if (key == VK_LEFT) { st->scrollX -= 40; if (st->scrollX < 0) st->scrollX = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
             if (key == VK_RIGHT) { st->scrollX += 40; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
-            if (key == VK_NEXT) { if (st->curPage < st->pdf.pageCount) st->curPage++; st->scrollY = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
-            if (key == VK_PRIOR) { if (st->curPage > 1) st->curPage--; st->scrollY = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
+            if (key == VK_NEXT) { if (st->curPage < st->pdf.pageCount) { st->curPage++; RenderCurrentPage(st); } st->scrollY = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
+            if (key == VK_PRIOR) { if (st->curPage > 1) { st->curPage--; RenderCurrentPage(st); } st->scrollY = 0; UpdateScrollbars(st); InvalidateRect(h, NULL, TRUE); return 0; }
             if (key == VK_ESCAPE) { SendMessageW(st->hwndParent, WM_CLOSE, 0, 0); return 0; }
             if (key == VK_RETURN && !shift) { SendMessageW(st->hwndParent, WM_CLOSE, 0, 0); return 0; }
             if (key == VK_RETURN && shift) { OpenInExplorer(st->file); return 0; }
@@ -285,7 +289,7 @@ static HWND CreateViewer(HWND parent, const std::wstring& file) {
     ViewerState* st = new ViewerState();
     st->hwnd = hwnd; st->hwndParent = parent; st->file = file; st->pdf = std::move(info);
     st->curPage = 1; st->zoom = 1.0; st->fit = true;
-    EnsurePageImage(st);
+    RenderCurrentPage(st);
     g_views[hwnd] = st;
     UpdateScrollbars(st);
     SetFocus(hwnd);
@@ -310,7 +314,7 @@ int __stdcall ListLoadNext(HWND ParentWin, HWND PluginWin, char* FileToLoad, int
     if (!info.valid) return LISTPLUGIN_ERROR;
     st->file = A2W(FileToLoad); st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
-    EnsurePageImage(st);
+    RenderCurrentPage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);
     return LISTPLUGIN_OK;
 }
@@ -322,7 +326,7 @@ int __stdcall ListLoadNextW(HWND ParentWin, HWND PluginWin, WCHAR* FileToLoad, i
     if (!info.valid) return LISTPLUGIN_ERROR;
     st->file = FileToLoad; st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
-    EnsurePageImage(st);
+    RenderCurrentPage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);
     return LISTPLUGIN_OK;
 }
@@ -350,13 +354,20 @@ void __stdcall ListSetDefaultParams(ListDefaultParamStruct* dps) {
     size_t p = m.find_last_of(L"\\/");
     g_pluginDir = (p == std::wstring::npos) ? L"" : m.substr(0, p);
     GhostscriptInterface::SetPluginDir(g_pluginDir);
+    GSRender::SetPluginDir(g_pluginDir);
+}
+
+static int PreviewPageFor(const std::wstring& file) {
+    // thumbnails always show page 1
+    (void)file; return 1;
 }
 
 static HBITMAP PreviewFor(const std::wstring& file, int w, int h) {
     HBITMAP cached = NULL;
     if (ThumbnailCache::LoadCachedBitmap(file, w, h, &cached)) return cached;
-    HBITMAP bmp = FlattenOverWhite(GetShellImage(file, w, h)); // real system rendering first
-    if (!bmp) bmp = GhostscriptInterface::RenderFirstPage(file, w, h); // badge fallback
+    HBITMAP bmp = GSRender::RenderThumb(file, PreviewPageFor(file), w, h); // Ghostscript first
+    if (!bmp) bmp = FlattenOverWhite(GetShellImage(file, w, h)); // system fallback
+    if (!bmp) bmp = GhostscriptInterface::RenderFirstPage(file, w, h); // badge last resort
     if (bmp) ThumbnailCache::StoreCachedBitmap(file, w, h, bmp);
     return bmp;
 }
