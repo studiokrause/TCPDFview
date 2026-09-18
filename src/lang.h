@@ -12,4 +12,6 @@ enum Lang {
 
 void SetLanguage(Lang lang);
 Lang DetectSystemLanguage();
+// keys: about_title, about_text, clear_cache, about_menu, fit, zin, zout,
+// prev_page, next_page, open_tc, open_exp, total 12 menu items
 std::wstring GetString(const std::string& key);

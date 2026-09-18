@@ -1,0 +1,7 @@
+build/
+build_x86/
+build_x64/
+stage_*/
+*.zip
+*.user
+.vs/

@@ -4,14 +4,11 @@
 
 static Lang currentLang = LANG_EN;
 
-void SetLanguage(Lang lang) {
-    currentLang = lang;
-}
+void SetLanguage(Lang lang) { currentLang = lang; }
 
 Lang DetectSystemLanguage() {
     LANGID lid = GetUserDefaultUILanguage();
-    WORD primLang = PRIMARYLANGID(lid);
-    switch (primLang) {
+    switch (PRIMARYLANGID(lid)) {
         case LANG_POLISH: return LANG_PL;
         case LANG_GERMAN: return LANG_DE;
         case LANG_FRENCH: return LANG_FR;
@@ -22,43 +19,31 @@ Lang DetectSystemLanguage() {
 }
 
 std::wstring GetString(const std::string& key) {
-    static std::map<std::string, std::map<Lang, std::wstring>> dict = {
-        {"about_title", {
-            {LANG_PL, L"O programie - TCPDFview"},
-            {LANG_EN, L"About - TCPDFview"},
-            {LANG_DE, L"Über - TCPDFview"},
-            {LANG_FR, L"À propos - TCPDFview"},
-            {LANG_ES, L"Acerca de - TCPDFview"},
-            {LANG_IT, L"Informazioni - TCPDFview"}
-        }},
+    static const std::map<std::string, std::map<Lang, std::wstring>> dict = {
+        {"about_title", {{LANG_PL,L"O programie - TCPDFview"},{LANG_EN,L"About - TCPDFview"},{LANG_DE,L"\u00dcber - TCPDFview"},{LANG_FR,L"\u00c0 propos - TCPDFview"},{LANG_ES,L"Acerca de - TCPDFview"},{LANG_IT,L"Informazioni - TCPDFview"}}},
         {"about_text", {
-            {LANG_PL, L"TCPDFview v0.1\nAutor: Studio Krause / gemini-flash-lite-latest\nLicencja: AGPL (zgodnie z Ghostscript)\nWtyczka podglądu PDF dla Total Commander."},
-            {LANG_EN, L"TCPDFview v0.1\nAuthor: Studio Krause / gemini-flash-lite-latest\nLicense: AGPL (due to Ghostscript)\nPDF viewer plugin for Total Commander."},
-            {LANG_DE, L"TCPDFview v0.1\nAutor: Studio Krause / gemini-flash-lite-latest\nLizenz: AGPL (aufgrund von Ghostscript)\nPDF-Betrachter-Plugin für Total Commander."},
-            {LANG_FR, L"TCPDFview v0.1\nAuteur : Studio Krause / gemini-flash-lite-latest\nLicence : AGPL (en raison de Ghostscript)\nPlugin de visualisation PDF pour Total Commander."},
-            {LANG_ES, L"TCPDFview v0.1\nAutor: Studio Krause / gemini-flash-lite-latest\nLicencia: AGPL (debido a Ghostscript)\nPlugin visor de PDF para Total Commander."},
-            {LANG_IT, L"TCPDFview v0.1\nAutore: Studio Krause / gemini-flash-lite-latest\nLicenza: AGPL (a causa di Ghostscript)\nPlugin visualizzatore PDF per Total Commander."}
-        }},
-        {"clear_cache", {
-            {LANG_PL, L"Wyczyść cache"},
-            {LANG_EN, L"Clear cache"},
-            {LANG_DE, L"Cache leeren"},
-            {LANG_FR, L"Effacer le cache"},
-            {LANG_ES, L"Limpiar caché"},
-            {LANG_IT, L"Cancella cache"}
-        }},
-        {"about_menu", {
-            {LANG_PL, L"O programie"},
-            {LANG_EN, L"About"},
-            {LANG_DE, L"Über"},
-            {LANG_FR, L"À propos"},
-            {LANG_ES, L"Acerca de"},
-            {LANG_IT, L"Informazioni"}
-        }}
+            {LANG_PL,L"TCPDFview v0.1\nAutor: Studio Krause / muse-spark\nLicencja: AGPL-3.0 (ze wzgl\u0119du na Ghostscript)\nWtyczka podgl\u0105du PDF dla Total Commander (WLX)."},
+            {LANG_EN,L"TCPDFview v0.1\nAuthor: Studio Krause / muse-spark\nLicense: AGPL-3.0 (due to Ghostscript)\nPDF viewer plugin for Total Commander (WLX)."},
+            {LANG_DE,L"TCPDFview v0.1\nAutor: Studio Krause / muse-spark\nLizenz: AGPL-3.0 (wegen Ghostscript)\nPDF-Betrachter-Plugin f\u00fcr Total Commander (WLX)."},
+            {LANG_FR,L"TCPDFview v0.1\nAuteur : Studio Krause / muse-spark\nLicence : AGPL-3.0 (\u00e0 cause de Ghostscript)\nPlugin de visualisation PDF pour Total Commander (WLX)."},
+            {LANG_ES,L"TCPDFview v0.1\nAutor: Studio Krause / muse-spark\nLicencia: AGPL-3.0 (debido a Ghostscript)\nPlugin visor de PDF para Total Commander (WLX)."},
+            {LANG_IT,L"TCPDFview v0.1\nAutore: Studio Krause / muse-spark\nLicenza: AGPL-3.0 (a causa di Ghostscript)\nPlugin visualizzatore PDF per Total Commander (WLX)."}}},
+        {"clear_cache", {{LANG_PL,L"Wyczy\u015b\u0107 cache"},{LANG_EN,L"Clear cache"},{LANG_DE,L"Cache leeren"},{LANG_FR,L"Effacer le cache"},{LANG_ES,L"Limpiar cach\u00e9"},{LANG_IT,L"Cancella cache"}}},
+        {"about_menu", {{LANG_PL,L"O programie"},{LANG_EN,L"About"},{LANG_DE,L"\u00dcber"},{LANG_FR,L"\u00c0 propos"},{LANG_ES,L"Acerca de"},{LANG_IT,L"Informazioni"}}},
+        {"fit", {{LANG_PL,L"Dopasuj do okna (0 / *)"},{LANG_EN,L"Fit to window (0 / *)"},{LANG_DE,L"An Fenster anpassen (0 / *)"},{LANG_FR,L"Ajuster \u00e0 la fen\u00eatre (0 / *)"},{LANG_ES,L"Ajustar a ventana (0 / *)"},{LANG_IT,L"Adatta alla finestra (0 / *)"}}},
+        {"zin", {{LANG_PL,L"Powi\u0119ksz (+)"},{LANG_EN,L"Zoom in (+)"},{LANG_DE,L"Vergr\u00f6\u00dfern (+)"},{LANG_FR,L"Zoom avant (+)"},{LANG_ES,L"Acercar (+)"},{LANG_IT,L"Ingrandisci (+)"}}},
+        {"zout", {{LANG_PL,L"Pomniejsz (-)"},{LANG_EN,L"Zoom out (-)"},{LANG_DE,L"Verkleinern (-)"},{LANG_FR,L"Zoom arri\u00e8re (-)"},{LANG_ES,L"Alejar (-)"},{LANG_IT,L"Riduci (-)"}}},
+        {"prev_page", {{LANG_PL,L"Poprzednia strona (PgUp)"},{LANG_EN,L"Previous page (PgUp)"},{LANG_DE,L"Vorherige Seite (PgUp)"},{LANG_FR,L"Page pr\u00e9c\u00e9dente (PgUp)"},{LANG_ES,L"P\u00e1gina anterior (PgUp)"},{LANG_IT,L"Pagina precedente (PgUp)"}}},
+        {"next_page", {{LANG_PL,L"Nast\u0119pna strona (PgDn)"},{LANG_EN,L"Next page (PgDn)"},{LANG_DE,L"N\u00e4chste Seite (PgDn)"},{LANG_FR,L"Page suivante (PgDn)"},{LANG_ES,L"P\u00e1gina siguiente (PgDn)"},{LANG_IT,L"Pagina successiva (PgDn)"}}},
+        {"open_tc", {{LANG_PL,L"Otw\u00f3rz w TC (Enter)"},{LANG_EN,L"Open in TC (Enter)"},{LANG_DE,L"In TC \u00f6ffnen (Enter)"},{LANG_FR,L"Ouvrir dans TC (Entr\u00e9e)"},{LANG_ES,L"Abrir en TC (Enter)"},{LANG_IT,L"Apri in TC (Invio)"}}},
+        {"open_exp", {{LANG_PL,L"Otw\u00f3rz w Explorerze (Shift+Enter)"},{LANG_EN,L"Open in Explorer (Shift+Enter)"},{LANG_DE,L"In Explorer \u00f6ffnen (Shift+Enter)"},{LANG_FR,L"Ouvrir dans l'Explorateur (Maj+Entr\u00e9e)"},{LANG_ES,L"Abrir en Explorador (Shift+Enter)"},{LANG_IT,L"Apri in Explorer (Maiusc+Invio)"}}},
     };
-
-    if (dict.find(key) != dict.end() && dict[key].find(currentLang) != dict[key].end()) {
-        return dict[key][currentLang];
+    auto it = dict.find(key);
+    if (it != dict.end()) {
+        auto jt = it->second.find(currentLang);
+        if (jt != it->second.end()) return jt->second;
+        auto je = it->second.find(LANG_EN);
+        if (je != it->second.end()) return je->second;
     }
     return std::wstring(key.begin(), key.end());
 }

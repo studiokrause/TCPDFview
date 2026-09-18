@@ -1,0 +1,16 @@
+LIBRARY tcpdfview
+EXPORTS
+    ListLoad
+    ListLoadW
+    ListLoadNext
+    ListLoadNextW
+    ListCloseWindow
+    ListGetDetectString
+    ListSetDefaultParams
+    ListGetPreviewBitmap
+    ListGetPreviewBitmapW
+    ListSearchText
+    ListSearchTextW
+    ListSendCommand
+    ListPrint
+    ListPrintW

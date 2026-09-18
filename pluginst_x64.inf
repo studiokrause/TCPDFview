@@ -1,0 +1,12 @@
+[plugininstall]
+description=TCPDFview PDF viewer & thumbnails (Lister WLX)
+descriptionpl=TCPDFview podglad PDF i miniatury (Lister WLX)
+descriptionde=TCPDFview PDF-Betrachter & Thumbnails (Lister WLX)
+descriptionfr=TCPDFview visionneuse PDF et miniatures (Lister WLX)
+descriptiones=TCPDFview visor PDF y miniaturas (Lister WLX)
+descriptionit=TCPDFview visualizzatore PDF e miniature (Lister WLX)
+type=wlx
+file=tcpdfview.wlx64
+defaultdir=TCPDFview
+defaultextension=pdf
+version=0.1
