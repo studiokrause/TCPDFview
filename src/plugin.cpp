@@ -14,9 +14,10 @@
 #include "lang.h"
 #include "cache.h"
 #include "ghostscript.h"
+#include "shellthumb.h"
 #include "pdfparse.h"
 
-#define TCPDFVIEW_VERSION L"0.1"
+#define TCPDFVIEW_VERSION L"0.2"
 
 static HINSTANCE g_hInst = NULL;
 static std::wstring g_iniPath;
@@ -29,12 +30,28 @@ struct ViewerState {
     HWND hwndParent = NULL;
     std::wstring file;
     PdfInfo pdf;
+    HBITMAP pageBmp = NULL; // system-rendered first page (IShellItemImageFactory)
+    int bmpW = 0, bmpH = 0;
     int curPage = 1;
     double zoom = 1.0;
     bool fit = true;
     int scrollX = 0;
     int scrollY = 0;
 };
+
+static void FreePageBmp(ViewerState* st) {
+    if (st && st->pageBmp) { DeleteObject(st->pageBmp); st->pageBmp = NULL; }
+}
+
+static void EnsurePageImage(ViewerState* st) {
+    FreePageBmp(st);
+    // hi-res enough for smooth zoom, capped for memory
+    st->pageBmp = GetShellImage(st->file, 1400, 1400);
+    if (st->pageBmp) {
+        BITMAP b{};
+        if (GetObject(st->pageBmp, sizeof(b), &b)) { st->bmpW = b.bmWidth; st->bmpH = b.bmHeight; }
+    }
+}
 
 static std::map<HWND, ViewerState*> g_views;
 
@@ -113,20 +130,8 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             RECT rc; GetClientRect(h, &rc);
             FillRect(dc, &rc, (HBRUSH)(COLOR_WINDOW + 1));
             if (st) {
-                // page rectangle
                 int margin = 12;
-                int pageW = (int)((rc.right - rc.left - 2 * margin) * st->zoom);
-                int pageH = (int)((rc.bottom - rc.top - 90) * st->zoom);
-                if (pageW < 50) pageW = 50; if (pageH < 50) pageH = 50;
-                int px = margin - st->scrollX / 4;
-                int py = margin - st->scrollY / 2;
-                if (px < margin) {} // keep simple
-                RECT page{margin, 54, margin + pageW, 54 + pageH};
-                HBRUSH white = CreateSolidBrush(RGB(255,255,255));
-                FillRect(dc, &page, white);
-                DeleteObject(white);
-                FrameRect(dc, &page, (HBRUSH)GetStockObject(GRAY_BRUSH));
-
+                int topY = 54;
                 // header
                 wchar_t head[512];
                 swprintf_s(head, L"TCPDFview v%s  |  %s  |  %d/%d  |  %d%%",
@@ -136,25 +141,51 @@ static LRESULT CALLBACK ViewerWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 SetBkMode(dc, TRANSPARENT);
                 DrawTextW(dc, head, -1, &RECT{margin, 4, rc.right - margin, 50}, DT_LEFT | DT_WORDBREAK);
 
-                // body text: distribute lines across pages
-                int totalPages = st->pdf.pageCount > 0 ? st->pdf.pageCount : 1;
-                size_t per = st->pdf.lines.empty() ? 0 : (st->pdf.lines.size() + totalPages - 1) / totalPages;
-                size_t from = (size_t)(st->curPage - 1) * per;
-                RECT body{page.left + 8 - st->scrollX / 4, page.top + 6 - (st->scrollY % 1000), page.right - 8, page.bottom - 8};
-                if (!st->pdf.valid) {
-                    DrawTextW(dc, L"(not a PDF file)", -1, &body, DT_LEFT | DT_TOP);
-                } else if (st->pdf.lines.empty()) {
-                    std::wstring note = GhostscriptInterface::Available()
-                        ? L"(scanned PDF - text layer empty; hi-res GS render in v0.2)"
-                        : L"(no extractable text on this page)";
-                    DrawTextW(dc, note.c_str(), -1, &body, DT_LEFT | DT_TOP | DT_WORDBREAK);
+                if (st->pageBmp && st->curPage == 1 && st->bmpW > 0 && st->bmpH > 0) {
+                    // real system-rendered first page
+                    int availW = rc.right - rc.left - 2 * margin;
+                    int availH = rc.bottom - topY - margin;
+                    if (availW < 50) availW = 50; if (availH < 50) availH = 50;
+                    double fitScale = min((double)availW / st->bmpW, (double)availH / st->bmpH);
+                    double scale = st->fit ? fitScale : fitScale * st->zoom;
+                    int dw = max(50, (int)(st->bmpW * scale));
+                    int dh = max(50, (int)(st->bmpH * scale));
+                    int dx = margin + (st->fit ? (availW - dw) / 2 : -st->scrollX);
+                    int dy = topY + (st->fit ? 0 : -st->scrollY);
+                    HDC mem = CreateCompatibleDC(dc);
+                    HBITMAP old = (HBITMAP)SelectObject(mem, st->pageBmp);
+                    SetStretchBltMode(dc, HALFTONE);
+                    StretchBlt(dc, dx, dy, dw, dh, mem, 0, 0, st->bmpW, st->bmpH, SRCCOPY);
+                    SelectObject(mem, old);
+                    DeleteDC(mem);
+                    // frame
+                    HPEN pen = CreatePen(PS_SOLID, 1, RGB(140, 140, 140));
+                    HPEN op = (HPEN)SelectObject(dc, pen);
+                    HBRUSH nob = (HBRUSH)GetStockObject(NULL_BRUSH);
+                    HBRUSH ob = (HBRUSH)SelectObject(dc, nob);
+                    Rectangle(dc, dx, dy, dx + dw, dy + dh);
+                    SelectObject(dc, ob); SelectObject(dc, op);
+                    DeleteObject(pen);
                 } else {
+                    // clean text fallback (pages >1 or no system thumbnail)
+                    int pageW = rc.right - rc.left - 2 * margin;
+                    int pageH = rc.bottom - topY - margin;
+                    if (pageW < 50) pageW = 50; if (pageH < 50) pageH = 50;
+                    RECT page{margin, topY, margin + pageW, topY + pageH};
+                    HBRUSH white = CreateSolidBrush(RGB(255,255,255));
+                    FillRect(dc, &page, white);
+                    DeleteObject(white);
+                    FrameRect(dc, &page, (HBRUSH)GetStockObject(GRAY_BRUSH));
+                    RECT body{page.left + 10, page.top + 8, page.right - 10, page.bottom - 10};
+                    int totalPages = st->pdf.pageCount > 0 ? st->pdf.pageCount : 1;
+                    size_t per = st->pdf.lines.empty() ? 0 : (st->pdf.lines.size() + totalPages - 1) / totalPages;
+                    size_t from = (size_t)(st->curPage - 1) * per;
                     std::wstring chunk;
                     for (size_t i = from; i < from + per && i < st->pdf.lines.size(); ++i) {
                         chunk += st->pdf.lines[i];
                         chunk += L"\r\n";
                     }
-                    if (chunk.empty()) chunk = L"(empty page)";
+                    if (chunk.empty()) chunk = GetString("notext");
                     DrawTextW(dc, chunk.c_str(), -1, &body, DT_LEFT | DT_TOP | DT_WORDBREAK);
                 }
             }
@@ -252,6 +283,7 @@ static HWND CreateViewer(HWND parent, const std::wstring& file) {
     ViewerState* st = new ViewerState();
     st->hwnd = hwnd; st->hwndParent = parent; st->file = file; st->pdf = std::move(info);
     st->curPage = 1; st->zoom = 1.0; st->fit = true;
+    EnsurePageImage(st);
     g_views[hwnd] = st;
     UpdateScrollbars(st);
     SetFocus(hwnd);
@@ -276,6 +308,7 @@ int __stdcall ListLoadNext(HWND ParentWin, HWND PluginWin, char* FileToLoad, int
     if (!info.valid) return LISTPLUGIN_ERROR;
     st->file = A2W(FileToLoad); st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
+    EnsurePageImage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);
     return LISTPLUGIN_OK;
 }
@@ -287,13 +320,14 @@ int __stdcall ListLoadNextW(HWND ParentWin, HWND PluginWin, WCHAR* FileToLoad, i
     if (!info.valid) return LISTPLUGIN_ERROR;
     st->file = FileToLoad; st->pdf = std::move(info);
     st->curPage = 1; st->scrollX = st->scrollY = 0;
+    EnsurePageImage(st);
     UpdateScrollbars(st); InvalidateRect(PluginWin, NULL, TRUE);
     return LISTPLUGIN_OK;
 }
 
 void __stdcall ListCloseWindow(HWND ListWin) {
     auto it = g_views.find(ListWin);
-    if (it != g_views.end()) { delete it->second; g_views.erase(it); }
+    if (it != g_views.end()) { FreePageBmp(it->second); delete it->second; g_views.erase(it); }
     DestroyWindow(ListWin);
 }
 
@@ -319,7 +353,8 @@ void __stdcall ListSetDefaultParams(ListDefaultParamStruct* dps) {
 static HBITMAP PreviewFor(const std::wstring& file, int w, int h) {
     HBITMAP cached = NULL;
     if (ThumbnailCache::LoadCachedBitmap(file, w, h, &cached)) return cached;
-    HBITMAP bmp = GhostscriptInterface::RenderFirstPage(file, w, h);
+    HBITMAP bmp = GetShellImage(file, w, h); // real system rendering first
+    if (!bmp) bmp = GhostscriptInterface::RenderFirstPage(file, w, h); // badge fallback
     if (bmp) ThumbnailCache::StoreCachedBitmap(file, w, h, bmp);
     return bmp;
 }

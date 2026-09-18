@@ -8,6 +8,7 @@ add_library(tcpdfview SHARED
     src/plugin.cpp
     src/pdfparse.cpp
     src/ghostscript.cpp
+    src/shellthumb.cpp
     src/cache.cpp
     src/lang.cpp
     src/tcpdfview.def
