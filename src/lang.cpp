@@ -22,12 +22,12 @@ std::wstring GetString(const std::string& key) {
     static const std::map<std::string, std::map<Lang, std::wstring>> dict = {
         {"about_title", {{LANG_PL,L"O programie - TCPDFview"},{LANG_EN,L"About - TCPDFview"},{LANG_DE,L"\u00dcber - TCPDFview"},{LANG_FR,L"\u00c0 propos - TCPDFview"},{LANG_ES,L"Acerca de - TCPDFview"},{LANG_IT,L"Informazioni - TCPDFview"}}},
         {"about_text", {
-            {LANG_PL,L"TCPDFview v0.2\nAutor: Studio Krause / muse-spark\nLicencja: AGPL-3.0 (ze względu na Ghostscript)\nWtyczka podglądu PDF dla Total Commander (WLX)."},
-            {LANG_EN,L"TCPDFview v0.2\nAuthor: Studio Krause / muse-spark\nLicense: AGPL-3.0 (due to Ghostscript)\nPDF viewer plugin for Total Commander (WLX)."},
-            {LANG_DE,L"TCPDFview v0.2\nAutor: Studio Krause / muse-spark\nLizenz: AGPL-3.0 (wegen Ghostscript)\nPDF-Betrachter-Plugin für Total Commander (WLX)."},
-            {LANG_FR,L"TCPDFview v0.2\nAuteur : Studio Krause / muse-spark\nLicence : AGPL-3.0 (à cause de Ghostscript)\nPlugin de visualisation PDF pour Total Commander (WLX)."},
-            {LANG_ES,L"TCPDFview v0.2\nAutor: Studio Krause / muse-spark\nLicencia: AGPL-3.0 (debido a Ghostscript)\nPlugin visor de PDF para Total Commander (WLX)."},
-            {LANG_IT,L"TCPDFview v0.2\nAutore: Studio Krause / muse-spark\nLicenza: AGPL-3.0 (a causa di Ghostscript)\nPlugin visualizzatore PDF per Total Commander (WLX)."}}},
+            {LANG_PL,L"TCPDFview v0.3\nAutor: Studio Krause / muse-spark\nLicencja: AGPL-3.0 (ze względu na Ghostscript)\nWtyczka podglądu PDF dla Total Commander (WLX)."},
+            {LANG_EN,L"TCPDFview v0.3\nAuthor: Studio Krause / muse-spark\nLicense: AGPL-3.0 (due to Ghostscript)\nPDF viewer plugin for Total Commander (WLX)."},
+            {LANG_DE,L"TCPDFview v0.3\nAutor: Studio Krause / muse-spark\nLizenz: AGPL-3.0 (wegen Ghostscript)\nPDF-Betrachter-Plugin für Total Commander (WLX)."},
+            {LANG_FR,L"TCPDFview v0.3\nAuteur : Studio Krause / muse-spark\nLicence : AGPL-3.0 (à cause de Ghostscript)\nPlugin de visualisation PDF pour Total Commander (WLX)."},
+            {LANG_ES,L"TCPDFview v0.3\nAutor: Studio Krause / muse-spark\nLicencia: AGPL-3.0 (debido a Ghostscript)\nPlugin visor de PDF para Total Commander (WLX)."},
+            {LANG_IT,L"TCPDFview v0.3\nAutore: Studio Krause / muse-spark\nLicenza: AGPL-3.0 (a causa di Ghostscript)\nPlugin visualizzatore PDF per Total Commander (WLX)."}}},
         {"notext", {
             {LANG_PL,L"(brak warstwy tekstowej na tej stronie — strona 1 renderowana jest graficznie przez system)"},
             {LANG_EN,L"(no text layer on this page — page 1 is rendered graphically by the system)"},

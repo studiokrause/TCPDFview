@@ -1,4 +1,4 @@
-// TCPDFview v0.1 — Total Commander Lister (WLX) plugin for PDF.
+// TCPDFview v0.3 — Total Commander Lister (WLX) plugin for PDF.
 // Implements official WLX API: ListLoad/W, ListLoadNext/W, ListCloseWindow,
 // ListGetDetectString, ListSetDefaultParams, ListGetPreviewBitmap/W,
 // ListSearchText/W, ListSendCommand, ListPrint/W.
@@ -17,7 +17,7 @@
 #include "shellthumb.h"
 #include "pdfparse.h"
 
-#define TCPDFVIEW_VERSION L"0.2"
+#define TCPDFVIEW_VERSION L"0.3"
 
 static HINSTANCE g_hInst = NULL;
 static std::wstring g_iniPath;
@@ -45,8 +45,10 @@ static void FreePageBmp(ViewerState* st) {
 
 static void EnsurePageImage(ViewerState* st) {
     FreePageBmp(st);
-    // hi-res enough for smooth zoom, capped for memory
-    st->pageBmp = GetShellImage(st->file, 1400, 1400);
+    // hi-res enough for smooth zoom, capped for memory.
+    // Flatten: shell bitmaps carry alpha -> composite over white,
+    // otherwise the page shows BLACK (StretchBlt ignores alpha).
+    st->pageBmp = FlattenOverWhite(GetShellImage(st->file, 1400, 1400));
     if (st->pageBmp) {
         BITMAP b{};
         if (GetObject(st->pageBmp, sizeof(b), &b)) { st->bmpW = b.bmWidth; st->bmpH = b.bmHeight; }
@@ -353,7 +355,7 @@ void __stdcall ListSetDefaultParams(ListDefaultParamStruct* dps) {
 static HBITMAP PreviewFor(const std::wstring& file, int w, int h) {
     HBITMAP cached = NULL;
     if (ThumbnailCache::LoadCachedBitmap(file, w, h, &cached)) return cached;
-    HBITMAP bmp = GetShellImage(file, w, h); // real system rendering first
+    HBITMAP bmp = FlattenOverWhite(GetShellImage(file, w, h)); // real system rendering first
     if (!bmp) bmp = GhostscriptInterface::RenderFirstPage(file, w, h); // badge fallback
     if (bmp) ThumbnailCache::StoreCachedBitmap(file, w, h, bmp);
     return bmp;

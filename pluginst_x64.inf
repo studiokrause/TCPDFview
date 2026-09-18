@@ -9,4 +9,4 @@ type=wlx
 file=tcpdfview.wlx64
 defaultdir=TCPDFview
 defaultextension=pdf
-version=0.2
+version=0.3

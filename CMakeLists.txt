@@ -30,6 +30,6 @@ set_target_properties(tcpdfview PROPERTIES
 target_include_directories(tcpdfview PRIVATE src)
 
 if(WIN32)
-    target_link_libraries(tcpdfview user32 gdi32 shell32 ole32 comctl32)
+    target_link_libraries(tcpdfview user32 gdi32 msimg32 shell32 ole32 comctl32)
     target_compile_definitions(tcpdfview PRIVATE UNICODE _UNICODE)
 endif()

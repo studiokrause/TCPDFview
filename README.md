@@ -3,7 +3,7 @@
 Total Commander Lister (WLX) plugin — PDF preview + thumbnails with cache.
 
 - **Author:** Studio Krause / muse-spark
-- **Version:** 0.2
+- **Version:** 0.3
 - **License:** AGPL-3.0 (due to Ghostscript — see `LICENSE` and note below)
 - **Type:** Lister plugin (`WLX`): 32-bit `tcpdfview.wlx`, 64-bit `tcpdfview.wlx64`
 - **Languages:** PL, EN, DE, FR, ES, IT (auto-detected from system UI language)
@@ -27,11 +27,13 @@ Page 1 is rendered graphically via the Windows shell thumbnail provider
 (`IShellItemImageFactory` — whatever renders PDF thumbnails on your PC:
 Edge / PDF24 / Adobe), so what you see in Lister matches Explorer thumbnails.
 Other pages show clean extracted text (binary PDF streams are skipped —
-no more mojibake). Full per-page raster (Ghostscript) is planned for v0.3.
+no more mojibake). Thumbnails arrive as opaque 24-bit DIBs composited over
+white (AlphaBlend), so system 32-bit ARGB thumbnails no longer show black.
+Full per-page raster (Ghostscript) is planned for v0.4.
 
 ## Installation (Total Commander auto-install)
 
-1. In Total Commander, navigate to the downloaded ZIP (`TCPDFview_v0.2_x86.zip` for 32-bit TC, `TCPDFview_v0.2_x64.zip` for 64-bit TC) and press **Enter** — TC reads `pluginst.inf` (`[plugininstall]`, `type=wlx`) and offers installation.
+1. In Total Commander, navigate to the downloaded ZIP (`TCPDFview_v0.3_x86.zip` for 32-bit TC, `TCPDFview_v0.3_x64.zip` for 64-bit TC) and press **Enter** — TC reads `pluginst.inf` (`[plugininstall]`, `type=wlx`) and offers installation.
 2. Confirm the directory (default `TCPDFview`).
 3. Press `F3` on any `.pdf` — detection string is `MULTIMEDIA & (EXT="PDF" | ([0]="%" & [1]="P" & [2]="D" & [3]="F"))`.
 
@@ -64,5 +66,6 @@ Place official `gsdll64.dll` (or `gsdll32.dll`) next to the plugin to enable fut
 
 ## Changelog
 
+- **0.3** — black-preview fix: shell bitmaps flattened over white (AlphaBlend, `msimg32`); verified on 32-bit TC path (x86 DLL in 32-bit process) and x64.
 - **0.2** — real rendering: system thumbnail provider draws page 1 in Lister and thumbnails; parser skips binary streams (no mojibake); clean text fallback for other pages.
 - **0.1** — first working release: WLX-compliant viewer, thumbnails + validating cache, 6 languages, x86/x64 TC installers.
