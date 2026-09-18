@@ -1,4 +1,4 @@
-// TCPDFview v0.4 — Total Commander Lister (WLX) plugin for PDF.
+// TCPDFview v0.5 — Total Commander Lister (WLX) plugin for PDF.
 // Implements official WLX API: ListLoad/W, ListLoadNext/W, ListCloseWindow,
 // ListGetDetectString, ListSetDefaultParams, ListGetPreviewBitmap/W,
 // ListSearchText/W, ListSendCommand, ListPrint/W.
@@ -18,7 +18,7 @@
 #include "shellthumb.h"
 #include "pdfparse.h"
 
-#define TCPDFVIEW_VERSION L"0.4"
+#define TCPDFVIEW_VERSION L"0.5"
 
 static HINSTANCE g_hInst = NULL;
 static std::wstring g_iniPath;

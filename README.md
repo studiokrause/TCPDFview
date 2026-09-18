@@ -3,7 +3,7 @@
 Total Commander Lister (WLX) plugin — PDF preview + thumbnails with cache.
 
 - **Author:** Studio Krause / muse-spark
-- **Version:** 0.4
+- **Version:** 0.5
 - **License:** AGPL-3.0 (due to Ghostscript — see `LICENSE` and note below)
 - **Type:** Lister plugin (`WLX`): 32-bit `tcpdfview.wlx`, 64-bit `tcpdfview.wlx64`
 - **Languages:** PL, EN, DE, FR, ES, IT (auto-detected from system UI language)
@@ -21,7 +21,7 @@ Total Commander Lister (WLX) plugin — PDF preview + thumbnails with cache.
 4. **Ghostscript 10.08.0 bundled:** `gsdll32.dll` / `gsdll64.dll` + `Resource/` + `iccprofiles/` + `lib/` ship inside the installer ZIP (see `gs/`). The plugin renders every page through `gsapi` (`bmp16m` device, 150 dpi in Lister). The whole plugin is therefore licensed **AGPL-3.0**.
 5. **Context menu:** all commands available on right-click; last item is **About** (author + version + AGPL).
 
-## Rendering (v0.4)
+## Rendering (v0.5)
 
 Every page is rasterized by the bundled Ghostscript (`gsapi`, `bmp16m`,
 150 dpi, antialiased text+graphics) — no more shell icons. Fallback chain
@@ -31,7 +31,7 @@ over white (AlphaBlend), so 32-bit ARGB sources never show black.
 
 ## Installation (Total Commander auto-install)
 
-1. In Total Commander, navigate to the downloaded ZIP (`TCPDFview_v0.4_x86.zip` for 32-bit TC, `TCPDFview_v0.4_x64.zip` for 64-bit TC) and press **Enter** — TC reads `pluginst.inf` (`[plugininstall]`, `type=wlx`) and offers installation.
+1. In Total Commander, navigate to the downloaded ZIP (`TCPDFview_v0.5_x86.zip` for 32-bit TC, `TCPDFview_v0.5_x64.zip` for 64-bit TC) and press **Enter** — TC reads `pluginst.inf` (`[plugininstall]`, `type=wlx`) and offers installation.
 2. Confirm the directory (default `TCPDFview`).
 3. Press `F3` on any `.pdf` — detection string is `MULTIMEDIA & (EXT="PDF" | ([0]="%" & [1]="P" & [2]="D" & [3]="F"))`.
 
@@ -70,6 +70,7 @@ hence this plugin is distributed under **AGPL-3.0** (full text in `LICENSE`).
 
 ## Changelog
 
+- **0.5** — Polish/menu encoding fix: all UI strings use `\u` escapes (encoding-independent) + `/utf-8` build flag; About/menu/about-text now show correct national characters in all 6 languages.
 - **0.4** — Ghostscript rendering: every page rasterized via bundled `gsdll` (`gsapi`, 150 dpi); DLL + `Resource/` + `iccprofiles/` + `lib/` inside both installers; full AGPL-3.0 text; `tools/fetch-gs.ps1` reproduces the bundle.
 - **0.3** — black-preview fix: shell bitmaps flattened over white (AlphaBlend, `msimg32`); verified on 32-bit TC path (x86 DLL in 32-bit process) and x64.
 - **0.2** — real rendering: system thumbnail provider draws page 1 in Lister and thumbnails; parser skips binary streams (no mojibake); clean text fallback for other pages.
